@@ -1,12 +1,19 @@
-const CACHE_NAME = 'pwa-cache-v1';
+const CACHE_NAME = 'pwa-cache-v2';
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/style.css',
-  '/app.js',
-  '/offline.html',
-  '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png',
+  './',
+  './index.html',
+  './style.css',
+  './script.js',
+  './map.js',
+  './storageHandler.js',
+  './spotifyfetch.js',
+  './data.js',
+  './cookies.js',
+  './manifest.json',
+  './privacy-policy.html',
+  './icons/192_logo.png',
+  './icons/512_logo.png',
+  './icons/undo-circular-arrow.png',
 ];
 
 self.addEventListener('install', event => {

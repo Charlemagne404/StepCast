@@ -4,6 +4,9 @@ const undoButton = document.getElementById('undo-btn');
 const saveGPSWalkButton = document.getElementById('save-gps-walk');
 const guestButton = document.getElementById('guest-button');
 const podcastNameInput = document.getElementById('podcast-input');
+const overlay = document.getElementById('overlay');
+const authPopup = document.getElementById('authPopup');
+const logoutButton = document.getElementById('logoutButton');
 
 const settingsButton = document.getElementById('settings-button');
 const settingsPopup = document.getElementById('settings-popup');
@@ -11,18 +14,162 @@ const exitSettingsButton = document.getElementById('exit-settings-button');
 
 import { podcastData } from "./data.js";
 import { Map } from "./map.js";
-import { searchPodcast } from "./spotifyfetch.js";
 import { LocalStorageHandler } from "./storageHandler.js";
 
-const socket = new WebSocket("wss://mpmc.ddns.net:5000");
 const localStorageHandler = new LocalStorageHandler();
 const testMap = new Map(localStorageHandler, podcastData);
+const AUTH_STORAGE_KEY = 'authToken';
+let authToken = localStorage.getItem(AUTH_STORAGE_KEY) || '';
+let walkMarkers = [];
 
-console.log(localStorageHandler.retrieveWalksFromLocalStorage());
+const trimTrailingSlash = (value) => String(value || '').replace(/\/+$/, '');
+const resolveApiBaseUrl = () => {
+    const configured = trimTrailingSlash(window.__STEPCAST_API_BASE_URL__);
+    if (configured) {
+        return configured;
+    }
+
+    if (window.location.protocol === 'file:') {
+        return 'http://127.0.0.1:5001';
+    }
+
+    const isLocalhost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+    if (isLocalhost && window.location.port !== '5001') {
+        return `${window.location.protocol}//${window.location.hostname}:5001`;
+    }
+
+    return trimTrailingSlash(window.location.origin);
+};
+const API_BASE_URL = resolveApiBaseUrl();
+
 testMap.showExistingWalks();
 
+const getApiUrl = (path) => `${API_BASE_URL}${path}`;
 
-searchPodcast();
+const parseResponseBody = async (response) => {
+    const text = await response.text();
+    if (!text) return {};
+
+    try {
+        return JSON.parse(text);
+    } catch {
+        return { message: text };
+    }
+};
+
+const setAuthToken = (token) => {
+    authToken = String(token || '').trim();
+
+    if (authToken) {
+        localStorage.setItem(AUTH_STORAGE_KEY, authToken);
+        return;
+    }
+
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+};
+
+const showLoggedInUi = () => {
+    overlay.style.display = "none";
+    authPopup.style.display = "none";
+    logoutButton.style.display = "block";
+};
+
+const showLoggedOutUi = () => {
+    overlay.style.display = "block";
+    authPopup.style.display = "flex";
+    logoutButton.style.display = "none";
+};
+
+const sendApiRequest = async (path, { method = 'GET', body, auth = true } = {}) => {
+    const headers = {};
+
+    if (body !== undefined) {
+        headers['Content-Type'] = 'application/json';
+    }
+
+    if (auth && authToken) {
+        headers.Authorization = `Bearer ${authToken}`;
+    }
+
+    const response = await fetch(getApiUrl(path), {
+        method,
+        headers,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+        credentials: 'include',
+    });
+
+    const data = await parseResponseBody(response);
+    return { response, data };
+};
+
+const refreshAuthSession = async () => {
+    try {
+        const { response, data } = await sendApiRequest('/api/auth/refresh_token', {
+            method: 'POST',
+            auth: false,
+        });
+
+        const nextToken = data.accessToken || data.token;
+        if (response.ok && nextToken) {
+            setAuthToken(nextToken);
+            return true;
+        }
+    } catch (error) {
+        console.error('Session refresh failed:', error);
+    }
+
+    setAuthToken('');
+    return false;
+};
+
+const apiRequest = async (path, options = {}) => {
+    const { auth = true, retryOn401 = true } = options;
+    const result = await sendApiRequest(path, options);
+
+    if (result.response.status === 401 && auth && retryOn401) {
+        const refreshed = await refreshAuthSession();
+        if (refreshed) {
+            return sendApiRequest(path, { ...options, retryOn401: false });
+        }
+
+        showLoggedOutUi();
+    }
+
+    return result;
+};
+
+const verifyCurrentSession = async () => {
+    if (!authToken) {
+        return false;
+    }
+
+    try {
+        const { response } = await sendApiRequest('/api/auth/me', {
+            method: 'GET',
+        });
+        return response.ok;
+    } catch (error) {
+        console.error('Session verification failed:', error);
+        return false;
+    }
+};
+
+const restoreAuthSession = async () => {
+    if (await verifyCurrentSession()) {
+        showLoggedInUi();
+        return true;
+    }
+
+    setAuthToken('');
+
+    if (await refreshAuthSession()) {
+        showLoggedInUi();
+        return true;
+    }
+
+    showLoggedOutUi();
+    return false;
+};
 
 
 // *******
@@ -58,11 +205,6 @@ testMap.map.on('click', (event) => {
 // *******
 
 saveWalkButton.addEventListener('click', (event) => {
-    console.log("");
-    console.log("");
-    console.log("");
-    console.log("");
-
     testMap.createSaveShowWalk();
 });
 
@@ -102,11 +244,9 @@ document.addEventListener('keydown', (event) => {
 });
 
 document.addEventListener('click', (event) => {
-    console.log(testMap.cursorHoversMap);
-
     if (!testMap.cursorHoversMap) {
         if (testMap.selectedWalk) {
-            testMap.deselectWalk(testMap.selectedWalk, testMap.selectedWalk.podcast.color);
+            testMap.deselectWalk(testMap.selectedWalk, testMap.getWalkColor(testMap.selectedWalk));
         }
     }
 });
@@ -117,7 +257,6 @@ document.addEventListener('click', (event) => {
 // *******
 
 settingsButton.onclick = function () {
-    console.log("click")
     settingsPopup.style.display = 'flex';
 }
 
@@ -140,45 +279,47 @@ let gpsPath = []; // Temporary GPS path storage
 let gpsPolyline = null;
 let userMarker; // Store the user's location marker
 
+const clearWalkMarkers = () => {
+    for (const marker of walkMarkers) {
+        testMap.map.removeLayer(marker);
+    }
+
+    walkMarkers = [];
+};
+
 const fetchWalks = async () => {
     try {
-        const response = await fetch('https://mpmc.ddns.net:5000/api/location', {
+        if (!authToken) {
+            clearWalkMarkers();
+            return;
+        }
+
+        const { response, data } = await apiRequest('/api/location', {
             method: 'GET',
-            headers: { 
-                'Content-Type': 'application/json',
-                // Optional: Add Authorization header (not needed if you're using cookies)
-                // 'Authorization': `Bearer ${yourToken}`
-            },
-            credentials: 'include'  // Ensure cookies are sent with the request
         });
 
         if (!response.ok) {
-            throw new Error("Failed to fetch walk data");
+            throw new Error(data.message || "Failed to fetch walk data");
         }
 
-        const walkData = await response.json();
+        clearWalkMarkers();
 
         // Display the walks on the map
-        walkData.forEach(walk => {
-            L.circle([walk.latitude, walk.longitude], {
+        data.forEach(walk => {
+            const marker = L.circle([walk.latitude, walk.longitude], {
                 color: 'red',
                 fillColor: '#ff6666',
                 fillOpacity: 0.6,
                 radius: 10
             }).addTo(testMap.map);
+
+            walkMarkers.push(marker);
         });
 
     } catch (error) {
         console.error("Error fetching walk data:", error);
     }
 };
-
-
-
-
-
-// Call this function when the page loads
-document.addEventListener("DOMContentLoaded", fetchWalks);
 
 
 // Function to create or update the user marker
@@ -196,13 +337,15 @@ const createUserMarker = (latlng) => {
 };
 
 // Get the user's initial position for setting the marker and centering the map
-navigator.geolocation.getCurrentPosition(position => {
-    let latlng = { lat: position.coords.latitude, lng: position.coords.longitude };
-    createUserMarker(latlng); // Create the marker initially
-    testMap.map.setView(latlng, 15); // Optionally, adjust the map view to the user's location
-}, error => {
-    console.error("Error getting initial location:", error);
-});
+if ('geolocation' in navigator) {
+    navigator.geolocation.getCurrentPosition(position => {
+        let latlng = { lat: position.coords.latitude, lng: position.coords.longitude };
+        createUserMarker(latlng); // Create the marker initially
+        testMap.map.setView(latlng, 15); // Optionally, adjust the map view to the user's location
+    }, error => {
+        console.error("Error getting initial location:", error);
+    });
+}
 
 // Function to start/stop tracking
 const toggleTracking = () => {
@@ -221,6 +364,11 @@ const toggleTracking = () => {
         document.getElementById('toggleTracking').innerText = "Start Tracking";
         alert("Tracking stopped. Now enter the podcast name and save your walk.");
     } else {
+        if (!('geolocation' in navigator) && !(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.startTracking)) {
+            alert("Geolocation is not supported on this device.");
+            return;
+        }
+
         // Start tracking
         gpsPath = []; // Clear previous path
         if (gpsPolyline) {
@@ -244,7 +392,6 @@ const toggleTracking = () => {
                 console.error("Error getting location:", error);
             }, { enableHighAccuracy: true });
 
-            console.log("Tracking started via JavaScript.");
         }
 
         document.getElementById('toggleTracking').innerText = "Stop Tracking";
@@ -257,14 +404,17 @@ const toggleTracking = () => {
 
 
 // Save walk data when the user clicks the "Save Walk" button
-saveGPSWalkButton.addEventListener('click', function() {    
+saveGPSWalkButton.addEventListener('click', async function() {
     // Ensure path only contains valid points
     let validPathHistory = gpsPath.filter(function(path) {
         return path.latLng && typeof path.latLng.lat === 'number' && typeof path.latLng.lng === 'number';
     });
 
 
-    testMap.createSaveShowWalk(validPathHistory.map(path => path.latLng));
+    const didSave = await testMap.createSaveShowWalk(validPathHistory.map(path => path.latLng));
+    if (!didSave) {
+        return;
+    }
 
     /*
     // Match podcast name with list (you need to implement podcastData)
@@ -285,7 +435,7 @@ saveGPSWalkButton.addEventListener('click', function() {
     var storedHistory = JSON.parse(localStorage.getItem('walkHistory')) || [];
     storedHistory.push(savedWalk);
     localStorage.setItem('walkHistory', JSON.stringify(storedHistory));
-    */ 
+    */
 
     // Reset everything for the next walk
     gpsPath = [];
@@ -296,7 +446,6 @@ saveGPSWalkButton.addEventListener('click', function() {
     addHistoryItem(savedWalk);         // Detta kommer inte längre att fungera
     addWalkToMap(savedWalk);
     */
-    console.log("Walk saved and cleared.");
 });
 
 // Attach event to tracking button
@@ -368,8 +517,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const authTitle = document.getElementById("authTitle");
     const switchToRegisterLink = document.getElementById("switchToRegister");
     const switchToLoginLink = document.getElementById("switchToLogin");
-    const overlay = document.getElementById("overlay");
-    const authPopup = document.getElementById("authPopup");
+    const toggleAuthText = document.getElementById("toggleAuth");
+    const toggleAuthBackText = document.getElementById("toggleAuthBack");
     const darkModeToggle = document.getElementById("dark-mode-toggle");
 
     // Apply dark mode if previously set
@@ -392,87 +541,92 @@ document.addEventListener("DOMContentLoaded", () => {
         darkModeToggle.addEventListener("click", toggleDarkMode);
     }
 
-    // Show login popup
-    overlay.style.display = "block";
-    authPopup.style.display = "flex";
-
     let isSignup = false;
+
+    function updateAuthMode(signupMode) {
+        isSignup = signupMode;
+        authTitle.textContent = signupMode ? "Sign Up" : "Login";
+        document.getElementById("authSubmit").textContent = signupMode ? "Sign Up" : "Login";
+        toggleAuthText.style.display = signupMode ? "none" : "block";
+        toggleAuthBackText.style.display = signupMode ? "block" : "none";
+    }
 
     // Switch to register view
     switchToRegisterLink.addEventListener("click", (e) => {
         e.preventDefault();
-        isSignup = true;
-        authTitle.textContent = "Sign Up";
-        document.getElementById("authSubmit").textContent = "Sign Up";
-        //document.getElementById("registerForm").style.display = "block";
-        //document.getElementById("loginForm").style.display = "none";
+        updateAuthMode(true);
     });
 
     // Switch to login view
     switchToLoginLink.addEventListener("click", (e) => {
         e.preventDefault();
-        isSignup = false;
-        authTitle.textContent = "Login";
-        document.getElementById("authSubmit").textContent = "Login";
-        //document.getElementById("registerForm").style.display = "none";
-        //document.getElementById("loginForm").style.display = "block";
+        updateAuthMode(false);
     });
 
     // Form submission logic
-    authForm.addEventListener("submit", (e) => {
+    authForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         const email = document.getElementById("authEmail").value;
         const password = document.getElementById("authPassword").value;
 
         const endpoint = isSignup ? '/api/auth/register' : '/api/auth/login';
-        
-        fetch(`https://mpmc.ddns.net:5000${endpoint}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                email: email,
-                password: password,
-            }),
-        })
-        .then((response) => {
-            if (response.ok) {
-                return response.json();
-            } else {
-                throw new Error(`${isSignup ? 'Sign-up' : 'Login'} failed`);
+
+        try {
+            const { response, data } = await apiRequest(endpoint, {
+                method: 'POST',
+                auth: false,
+                retryOn401: false,
+                body: {
+                    email: email,
+                    password: password,
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error(data.message || `${isSignup ? 'Sign-up' : 'Login'} failed`);
             }
-        })
-        .then((data) => {
-            localStorage.setItem("authToken", data.token); // Save auth token
-            overlay.style.display = "none";
-            authPopup.style.display = "none";
-            checkAuth(); // Check auth status after successful login/signup
-        })
-        .catch((error) => {
+
+            const nextToken = data.accessToken || data.token;
+            if (nextToken) {
+                setAuthToken(nextToken);
+                showLoggedInUi();
+                await fetchWalks();
+                return;
+            }
+
+            alert(data.message || (isSignup
+                ? 'Registration complete. Check your inbox to verify your Continental ID account before signing in.'
+                : 'Continental ID did not return an active session.'));
+
+            if (isSignup) {
+                updateAuthMode(false);
+            }
+        } catch (error) {
             console.error(error);
-            alert(`${isSignup ? 'Sign-up' : 'Login'} failed. Please check your credentials.`);
-        });
+            alert(error.message || `${isSignup ? 'Sign-up' : 'Login'} failed. Please check your credentials.`);
+        }
     });
 
-    // Check login status on page load
-    checkAuth();
+    logoutButton.addEventListener('click', async () => {
+        try {
+            await sendApiRequest('/api/auth/logout', {
+                method: 'POST',
+                auth: false,
+            });
+        } catch (error) {
+            console.error('Logout failed:', error);
+        } finally {
+            setAuthToken('');
+            clearWalkMarkers();
+            showLoggedOutUi();
+        }
+    });
+
+    restoreAuthSession().then((authenticated) => {
+        if (authenticated) {
+            fetchWalks();
+        }
+    });
+
+    updateAuthMode(false);
 });
-
-// Function to check if user is logged in
-function checkAuth() {
-    const authToken = localStorage.getItem('authToken');
-    const overlay = document.getElementById('overlay');
-    const authPopup = document.getElementById('authPopup');
-    const logoutButton = document.getElementById('logoutButton');
-
-    if (authToken) {
-        overlay.style.display = "none";
-        authPopup.style.display = "none";
-        logoutButton.style.display = "block";  // Show logout button
-    } else {
-        overlay.style.display = "block";
-        authPopup.style.display = "flex";
-        logoutButton.style.display = "block";  // Hide logout button
-    }
-}

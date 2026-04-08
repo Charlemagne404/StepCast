@@ -1,27 +1,29 @@
 export class LocalStorageHandler {
     constructor() {}
 
+    getStoredWalks() {
+        try {
+            const walks = JSON.parse(localStorage.getItem('walks'));
+            return Array.isArray(walks) ? walks : [];
+        } catch (error) {
+            console.error('Failed to parse saved walks:', error);
+            return [];
+        }
+    }
+
     saveWalkToLocalStorage(walk) {
-        let send = JSON.parse(localStorage.getItem('walks')) || [];
-        send.push(walk);
-        localStorage.setItem('walks', JSON.stringify(send));
+        const walks = this.getStoredWalks();
+        walks.push(walk);
+        localStorage.setItem('walks', JSON.stringify(walks));
     }
 
     removeWalkFromLocalStorage(walk) {
-        let walks = JSON.parse(localStorage.getItem('walks')) || [];
-        walks = walks.filter(obj => obj.id !== walk.id);
+        const walks = this.getStoredWalks().filter((storedWalk) => storedWalk.id !== walk.id);
         localStorage.setItem('walks', JSON.stringify(walks));
     }
 
     retrieveWalksFromLocalStorage() {
-        const walks = JSON.parse(localStorage.getItem('walks'));
-
-        if (JSON.parse(localStorage.getItem('walks')) !== null) {
-            return walks;
-        }
-        else {
-            return [];
-        }
+        return this.getStoredWalks();
     }
 
     clearLocalStorage() {

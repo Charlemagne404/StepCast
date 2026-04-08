@@ -1,27 +1,42 @@
-// middleware/authMiddleware.js
+const {
+    extractContinentalUserId,
+    fetchContinentalAuth,
+    parseProxyResponseBody,
+} = require('../utils/continentalAuth');
 
-const jwt = require('jsonwebtoken');
+const authenticate = async (req, res, next) => {
+    const header = String(req.headers.authorization || '');
+    const [scheme, token] = header.split(' ');
 
-const authenticate = (req, res, next) => {
-    const token = req.cookies.token; // Get token from cookies
-
-    if (!token) {
-        return res.status(401).json({ message: 'No token provided.' });
+    if (scheme !== 'Bearer' || !token) {
+        return res.status(401).json({ message: 'Authorization token required.' });
     }
 
     try {
-        if (!process.env.JWT_SECRET) {
-            throw new Error('JWT_SECRET is not defined in environment variables.');
+        const upstreamResponse = await fetchContinentalAuth('/api/auth/me', { req });
+        const payload = await parseProxyResponseBody(upstreamResponse);
+
+        if (!upstreamResponse.ok) {
+            if (upstreamResponse.status === 401) {
+                return res.status(401).json({ message: payload.message || 'Token invalid or expired.' });
+            }
+
+            return res.status(502).json({ message: 'Continental ID could not validate this session.' });
         }
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        req.userId = decoded.userId; // Attach userId to request
-        next();
+        const userId = extractContinentalUserId(payload);
+        if (!userId) {
+            return res.status(502).json({ message: 'Continental ID response did not include a user id.' });
+        }
+
+        req.userId = userId;
+        req.user = payload.user || payload;
+        req.continentalAuth = payload;
+        return next();
     } catch (error) {
         console.error('Authentication error:', error);
-        res.status(401).json({ message: 'Invalid or expired token.' });
+        return res.status(502).json({ message: 'Continental ID is unavailable right now.' });
     }
 };
 
 module.exports = authenticate;
-

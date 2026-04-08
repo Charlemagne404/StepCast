@@ -23,7 +23,7 @@
             
             <button id="dark-mode-toggle">Toggle Dark Mode</button>
             <button id="privacy-policy-button">Privacy Policy</button>
-            <button id="logoutButton" style="display: block;">Logout</button>
+            <button id="logoutButton" style="display: none;">Logout</button>
 
             <script>
                 document.getElementById('privacy-policy-button').addEventListener('click', function() {
@@ -110,14 +110,6 @@
                     console.error('Service Worker registration failed:', error);
                 });
             });
-        }
-    </script>
-
-    <script>
-        if (window.matchMedia('(display-mode: standalone)').matches) {
-            if (!location.pathname.startsWith('/Walk-Tracker-Web-App/')) {
-                location.href = '/Walk-Tracker-Web-App/';
-            }
         }
     </script>
 

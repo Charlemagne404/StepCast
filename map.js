@@ -24,7 +24,7 @@ export class Map {
         this.isHoveringPolyline = false;
         this.isPolylineSelected = false;
         this.selectedPolyline;
-        this.selectedWalk;
+        this.selectedWalk = null;
         this.visibleWalks = [];
         this.cursorHoversMap = false;
         this.sessionActions = [];
@@ -45,11 +45,11 @@ export class Map {
     }
 
     findMatchingPodcastIndex(podcastName) {
-        for (let i = 0; i < this.podcastList.length; i++) {
-            if (this.podcastList[i].name === podcastName) {
-                return i;
-            }
-        }
+        return this.podcastList.findIndex((podcast) => podcast.name === podcastName);
+    }
+
+    getWalkColor(walk) {
+        return walk?.podcast?.color || '#000000';
     }
 
     showExistingWalks() {
@@ -59,9 +59,11 @@ export class Map {
         // Remove all previous walks from map and list
         historyList.innerHTML = '';
 
-        this.visibleWalks.forEach(walk => { 
+        this.visibleWalks.forEach(walk => {
             this.removeWalkFromMap(walk);            
         });
+        this.visibleWalks = [];
+        this.selectedWalk = null;
 
         // Add all walks to map and list
         if (walks.length > 0) {
@@ -117,7 +119,7 @@ export class Map {
     showTooltip(walk, color) {
         let tooltipContent;
     
-        if (walk.podcastFetchAdress !== undefined) {
+        if (walk.podcastFetchAdress) {
             tooltipContent = `
                 <div style="text-align: center; display: flex; flex-direction: column; align-items: center;">
                     <img src="${walk.podcastFetchAdress}" alt="${walk.podcastName} Logo" style="max-width: 50px; max-height: 50px; margin-bottom: 10px; object-fit: contain;">
@@ -128,8 +130,7 @@ export class Map {
         else {
             tooltipContent = `
                 <div style="text-align: center; display: flex; flex-direction: column; align-items: center;">
-                    <img src="" alt="Failed To Load" style="max-width: 50px; max-height: 50px; margin-bottom: 10px; object-fit: contain;">
-                    <div style="font-weight: bold; color: 000000; font-size: 14px; text-align: center;">Failed</div>
+                    <div style="font-weight: bold; color: ${color}; font-size: 14px; text-align: center;">${walk.podcastName}</div>
                 </div>
             `;
         }
@@ -138,26 +139,14 @@ export class Map {
     }
 
     showWalkOnMap(walk) {
-        if ("points" in walk) {
-            if (walk.points === undefined) {
-                console.log("No points found in walk: ", walk); // Debugging statement
-                return;
-            }
+        if (!Array.isArray(walk?.points) || walk.points.length === 0) {
+            return;
         }
 
-
-        //const displayPoints = walk.points.this(point => L.latLng(point.lat, point.lng));
-        
-        let displayColor; 
-        if (walk.podcast !== undefined && walk.podcast.color !== undefined) {
-            displayColor = walk.podcast.color;
-        }
-        else {
-            displayColor = '#000000';
-        }
+        const displayColor = this.getWalkColor(walk);
 
         walk.polyline = L.polyline(walk.points, { color: displayColor, weight: 4 }).addTo(this.map);
-        this.visibleWalks.push(walk); // Clear this maybe?
+        this.visibleWalks.push(walk);
 
         walk.polyline.on('mouseover', () => {this.allowMarkerPlacement = false;});
         walk.polyline.on('mouseout', () => {this.allowMarkerPlacement = true;});
@@ -196,50 +185,54 @@ export class Map {
             } else {
                 // Deselect the previously selected polyline
                 if (this.selectedWalk) {
-                    this.deselectWalk(this.selectedWalk, this.selectedWalk.podcast.color);
+                    this.deselectWalk(this.selectedWalk, this.getWalkColor(this.selectedWalk));
                 }
 
                 this.selectWalk(walk);
-
-                console.log("Selected walk:", walk);
             }
         });
     }
 
     removeWalkFromMap(walk) {
-        this.map.removeLayer(walk.polyline);
+        if (walk?.polyline && this.map.hasLayer(walk.polyline)) {
+            this.map.removeLayer(walk.polyline);
+        }
     }
 
     async createNewWalk(pointsInput) {
-        //if (podcastNameInput.value.trim() === '') {return;}
-        //if (this.markers.length <= 0) {return;}
+        let points = Array.isArray(pointsInput)
+            ? pointsInput.filter((point) => Number.isFinite(point?.lat) && Number.isFinite(point?.lng))
+            : this.markers.map((marker) => marker.latLng);
+        const podcastName = podcastNameInput.value.trim();
 
-        console.log(pointsInput);
-        let points = [];
-        if (!pointsInput) {
-            this.markers.forEach(marker => {
-                points.push(marker.latLng);
-            });
-        }
-        else {
-            points = pointsInput;
+        if (!podcastName || points.length === 0) {
+            return null;
         }
 
-        //const walk = new Walk(this, podcastNameInput.value, points, new Date().toISOString());
+        const podcastIndex = this.findMatchingPodcastIndex(podcastName);
+        const podcast = podcastIndex >= 0
+            ? this.podcastList[podcastIndex]
+            : {
+                name: podcastName,
+                color: '#000000',
+                logoUrl: '',
+            };
 
         const walkObj = {
-            id: Math.random(),
-            podcastName: podcastNameInput.value,
-            podcastIndex: this.findMatchingPodcastIndex(podcastNameInput.value),
-            podcast: this.podcastList[this.findMatchingPodcastIndex(podcastNameInput.value)],
-            podcastFetchAdress: await searchPodcast(podcastNameInput.value),
+            id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+            podcastName,
+            podcastIndex,
+            podcast,
+            podcastFetchAdress: podcast.logoUrl || await searchPodcast(podcastName),
             points: points,
             date: new Date().toISOString(),
             polyline: null
         };
 
-        for (let i = 0; i < this.markers.length; i++) {
-            this.map.removeLayer(this.markers[i].marker);
+        for (const marker of this.markers) {
+            if (this.map.hasLayer(marker.marker)) {
+                this.map.removeLayer(marker.marker);
+            }
         }
 
         podcastNameInput.value = '';
@@ -256,9 +249,6 @@ export class Map {
             
             
             this.markers.push({marker: marker, latLng: latLng});
-            //pathHistory.push({ latLng: latLng, podcast: null });
-
-            console.log(event.latlng);
         }
 
         this.sessionActions.push("placed marker");
@@ -307,24 +297,17 @@ export class Map {
     }
 
     async createSaveShowWalk(points) {
+        const newWalk = points !== undefined
+            ? await this.createNewWalk(points)
+            : await this.createNewWalk();
 
-
-        let newWalk;
-        if (points !== undefined) {newWalk = await this.createNewWalk(points);}
-        else {newWalk = await this.createNewWalk();}
-        
-        console.log(newWalk);
-
-        if (newWalk !== undefined && newWalk.podcastName !== "") {
-            console.log(newWalk);
-    
-            this.localStorageHandler.saveWalkToLocalStorage(newWalk);
-            this.showExistingWalks();
-        
-            console.log("walk!");
+        if (!newWalk) {
+            alert("Enter a podcast name and record at least one point before saving.");
+            return false;
         }
-        else {
-            alert("Bruh!");
-        }
+
+        this.localStorageHandler.saveWalkToLocalStorage(newWalk);
+        this.showExistingWalks();
+        return true;
     }
 }

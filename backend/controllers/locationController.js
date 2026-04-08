@@ -7,6 +7,10 @@ exports.saveWalk = async (req, res) => {
     const { userId } = req;
 
     try {
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+            return res.status(400).json({ message: 'Latitude and longitude are required.' });
+        }
+
         const walk = new Walk({ latitude, longitude, userId });
         await walk.save();
         res.status(200).json({ message: 'Walk saved successfully' });
@@ -14,5 +18,4 @@ exports.saveWalk = async (req, res) => {
         res.status(500).json({ message: 'Error saving walk data.', error });
     }
 };
-
 

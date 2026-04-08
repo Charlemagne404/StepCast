@@ -2,13 +2,17 @@
   "name": "walk-tracker-backend",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js",
+    "check": "node --check server.js && node --check routes/authRoutes.js && node --check routes/locationRoutes.js && node --check controllers/authController.js && node --check controllers/locationController.js && node --check middleware/authMiddleware.js && node --check models/user.js && node --check models/walk.js && node --check utils/continentalAuth.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "bcryptjs": "^3.0.2",
     "cookie-parser": "^1.4.6",
