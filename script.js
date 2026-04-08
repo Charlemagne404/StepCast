@@ -30,12 +30,12 @@ const resolveApiBaseUrl = () => {
     }
 
     if (window.location.protocol === 'file:') {
-        return 'http://127.0.0.1:5001';
+        return 'http://127.0.0.1:5002';
     }
 
     const isLocalhost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
-    if (isLocalhost && window.location.port !== '5001') {
-        return `${window.location.protocol}//${window.location.hostname}:5001`;
+    if (isLocalhost && window.location.port !== '5002') {
+        return `${window.location.protocol}//${window.location.hostname}:5002`;
     }
 
     return trimTrailingSlash(window.location.origin);
