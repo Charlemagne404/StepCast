@@ -19,18 +19,21 @@ import { LocalStorageHandler } from "./storageHandler.js";
 const localStorageHandler = new LocalStorageHandler();
 const testMap = new Map(localStorageHandler, podcastData);
 const AUTH_STORAGE_KEY = 'authToken';
+const DEFAULT_LOCAL_API_ORIGIN = 'http://127.0.0.1:5002';
 let authToken = localStorage.getItem(AUTH_STORAGE_KEY) || '';
 let walkMarkers = [];
 
 const trimTrailingSlash = (value) => String(value || '').replace(/\/+$/, '');
+const readConfiguredApiBaseUrl = () => trimTrailingSlash(window.__STEPCAST_API_BASE_URL__);
+const isGitHubPagesHost = () => window.location.hostname.endsWith('github.io');
 const resolveApiBaseUrl = () => {
-    const configured = trimTrailingSlash(window.__STEPCAST_API_BASE_URL__);
+    const configured = readConfiguredApiBaseUrl();
     if (configured) {
         return configured;
     }
 
     if (window.location.protocol === 'file:') {
-        return 'http://127.0.0.1:5002';
+        return DEFAULT_LOCAL_API_ORIGIN;
     }
 
     const isLocalhost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
@@ -38,13 +41,24 @@ const resolveApiBaseUrl = () => {
         return `${window.location.protocol}//${window.location.hostname}:5002`;
     }
 
+    if (isGitHubPagesHost()) {
+        return '';
+    }
+
     return trimTrailingSlash(window.location.origin);
 };
 const API_BASE_URL = resolveApiBaseUrl();
+const API_CONFIGURATION_ERROR = 'StepCast API is not configured for this deployment. Set window.__STEPCAST_API_BASE_URL__ in config.js to your backend origin.';
 
 testMap.showExistingWalks();
 
-const getApiUrl = (path) => `${API_BASE_URL}${path}`;
+const getApiUrl = (path) => {
+    if (!API_BASE_URL) {
+        throw new Error(API_CONFIGURATION_ERROR);
+    }
+
+    return `${API_BASE_URL}${path}`;
+};
 
 const parseResponseBody = async (response) => {
     const text = await response.text();
@@ -155,6 +169,12 @@ const verifyCurrentSession = async () => {
 };
 
 const restoreAuthSession = async () => {
+    if (!API_BASE_URL) {
+        setAuthToken('');
+        showLoggedOutUi();
+        return false;
+    }
+
     if (await verifyCurrentSession()) {
         showLoggedInUi();
         return true;
@@ -289,7 +309,7 @@ const clearWalkMarkers = () => {
 
 const fetchWalks = async () => {
     try {
-        if (!authToken) {
+        if (!API_BASE_URL || !authToken) {
             clearWalkMarkers();
             return;
         }
@@ -566,6 +586,11 @@ document.addEventListener("DOMContentLoaded", () => {
     // Form submission logic
     authForm.addEventListener("submit", async (e) => {
         e.preventDefault();
+        if (!API_BASE_URL) {
+            alert(API_CONFIGURATION_ERROR);
+            return;
+        }
+
         const email = document.getElementById("authEmail").value;
         const password = document.getElementById("authPassword").value;
 
