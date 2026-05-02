@@ -21,7 +21,15 @@ mongoose.connect(process.env.MONGO_URI)
     .catch((err) => console.error('Failed to connect to MongoDB:', err));
 
 // CORS Configuration
-const allowedOrigins = (process.env.CORS_ORIGIN || 'http://127.0.0.1:5500')
+const defaultAllowedOrigins = [
+    'http://127.0.0.1:5500',
+    'http://localhost:5500',
+    'https://charlemagne404.github.io',
+    'https://login.continental-hub.com',
+    'https://dashboard.continental-hub.com',
+];
+
+const allowedOrigins = (process.env.CORS_ORIGIN || defaultAllowedOrigins.join(','))
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);

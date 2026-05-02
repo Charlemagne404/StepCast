@@ -24,9 +24,7 @@
                     <img src="icons/192_logo.png" alt="StepCast logo">
                 </div>
                 <div class="brand-copy">
-                    <p class="section-kicker">Podcast Walking Atlas</p>
                     <h1>StepCast</h1>
-                    <p class="brand-subtitle">Map every episode to a route worth remembering.</p>
                 </div>
             </div>
 
@@ -41,43 +39,43 @@
 
         <main class="dashboard">
             <section class="map-stage surface-card">
-                <div class="map-stage__header">
-                    <div>
-                        <p class="section-kicker">Map Studio</p>
-                        <h2>Build a route by hand or let GPS trace it live.</h2>
-                    </div>
+                <div class="map-stage__topbar">
+                    <h2>Map</h2>
 
-                    <div class="map-stage__stats">
+                    <div class="map-stage__actions">
                         <span class="status-pill" id="map-status-pill">Ready to plot</span>
-                        <span class="micro-stat"><strong id="draft-point-count">0</strong> draft pins</span>
-                        <span class="micro-stat"><strong id="gps-point-count">0</strong> GPS points</span>
-                    </div>
-                </div>
+                        <details class="map-options-menu">
+                            <summary class="secondary-button">Map options</summary>
+                            <div class="map-options-menu__panel">
+                                <span class="field-label">Map style</span>
+                                <div class="segmented-control" aria-label="Map style">
+                                    <button class="map-type-button is-active" type="button" data-map-type="open">Classic</button>
+                                    <button class="map-type-button" type="button" data-map-type="light">Light</button>
+                                    <button class="map-type-button" type="button" data-map-type="dark">Night</button>
+                                    <button class="map-type-button" type="button" data-map-type="topographic">Topo</button>
+                                </div>
 
-                <div class="map-toolbar">
-                    <div class="segmented-control" aria-label="Map style">
-                        <button class="map-type-button is-active" type="button" data-map-type="open">Classic</button>
-                        <button class="map-type-button" type="button" data-map-type="light">Light</button>
-                        <button class="map-type-button" type="button" data-map-type="dark">Night</button>
-                        <button class="map-type-button" type="button" data-map-type="topographic">Topo</button>
-                    </div>
-
-                    <div class="map-toolbar__meta">
-                        <span id="auth-status-label" class="connection-pill">Guest mode</span>
+                                <div class="map-options-menu__meta">
+                                    <span id="auth-status-label" class="connection-pill">Guest mode</span>
+                                    <span class="micro-stat"><strong id="draft-point-count">0</strong> draft pins</span>
+                                    <span class="micro-stat"><strong id="gps-point-count">0</strong> GPS points</span>
+                                </div>
+                            </div>
+                        </details>
                     </div>
                 </div>
 
                 <div class="map-frame">
                     <div class="floating-rail">
                         <button id="undo-btn" class="icon-button icon-button--stacked" type="button" aria-label="Undo last action">
-                            <img src="./icons/undo-circular-arrow.png" width="20" height="20" alt="">
+                            <span class="icon-button__glyph icon-button__glyph--undo" aria-hidden="true">↶</span>
                             <span class="icon-button__label">Undo</span>
                         </button>
                     </div>
 
                     <div id="map"></div>
 
-                    <div class="status-banner" id="status-banner" data-tone="default">
+                    <div class="status-banner" id="status-banner" data-tone="default" hidden>
                         <p class="status-banner__title" id="status-banner-title">Ready to map</p>
                         <p class="status-banner__body" id="status-banner-body">Drop pins for a manual route or start GPS tracking for a live walk.</p>
                     </div>
@@ -85,50 +83,10 @@
             </section>
 
             <aside class="control-column">
-                <section class="overview-panel surface-card">
-                    <div class="panel-heading">
-                        <div>
-                            <p class="section-kicker">Overview</p>
-                            <h3>Keep the session in view</h3>
-                        </div>
-                    </div>
-
-                    <div class="stat-grid">
-                        <article class="stat-card">
-                            <span class="stat-card__label">Saved walks</span>
-                            <strong class="stat-card__value" id="stat-total-walks">0</strong>
-                        </article>
-                        <article class="stat-card">
-                            <span class="stat-card__label">Distance logged</span>
-                            <strong class="stat-card__value" id="stat-total-distance">0.00 km</strong>
-                        </article>
-                        <article class="stat-card">
-                            <span class="stat-card__label">Current draft</span>
-                            <strong class="stat-card__value" id="stat-current-draft">0 points</strong>
-                        </article>
-                        <article class="stat-card">
-                            <span class="stat-card__label">Last save</span>
-                            <strong class="stat-card__value" id="stat-last-saved">Nothing yet</strong>
-                        </article>
-                    </div>
-
-                    <div class="insight-strip">
-                        <div class="insight-chip">
-                            <span class="insight-chip__label">Selection</span>
-                            <strong class="insight-chip__value" id="selection-state">No route selected</strong>
-                        </div>
-                        <div class="insight-chip">
-                            <span class="insight-chip__label">Tracking</span>
-                            <strong class="insight-chip__value" id="tracking-state">GPS idle</strong>
-                        </div>
-                    </div>
-                </section>
-
                 <section class="composer-panel surface-card">
                     <div class="panel-heading">
                         <div>
-                            <p class="section-kicker">Capture</p>
-                            <h3>Save the walk to a podcast</h3>
+                            <h3>Save route</h3>
                         </div>
                     </div>
 
@@ -143,79 +101,197 @@
                         <button id="save-gps-walk" class="secondary-button" type="button">Save GPS route</button>
                     </div>
 
-                    <div class="tracking-card">
-                        <div class="tracking-card__copy">
-                            <span class="tracking-card__eyebrow">Live mode</span>
-                            <strong>Turn movement into a route automatically.</strong>
-                            <p>Start tracking before your walk, then save the path once you are done.</p>
-                        </div>
+                    <div class="tracking-card tracking-card--compact">
                         <button id="toggleTracking" class="tracking-button" type="button">Start live tracking</button>
-                    </div>
-
-                    <div class="tips-panel">
-                        <p class="tips-panel__title">Best flow</p>
-                        <p>Plot manually by tapping the map, or record live with GPS. Either way, name the podcast first so the route lands in the right collection.</p>
+                        <p>Record with GPS when you want the route captured automatically.</p>
                     </div>
                 </section>
 
-                <section class="history-panel surface-card" id="walk-history">
-                    <div class="panel-heading panel-heading--history">
-                        <div>
-                            <p class="section-kicker">Library</p>
-                            <h3>Saved walks</h3>
+                <details class="detail-panel surface-card">
+                    <summary class="detail-panel__summary">
+                        <h3>Session details</h3>
+                    </summary>
+
+                    <div class="detail-panel__body">
+                        <div class="stat-grid">
+                            <article class="stat-card">
+                                <span class="stat-card__label">Saved walks</span>
+                                <strong class="stat-card__value" id="stat-total-walks">0</strong>
+                            </article>
+                            <article class="stat-card">
+                                <span class="stat-card__label">Distance logged</span>
+                                <strong class="stat-card__value" id="stat-total-distance">0.00 km</strong>
+                            </article>
+                            <article class="stat-card">
+                                <span class="stat-card__label">Current draft</span>
+                                <strong class="stat-card__value" id="stat-current-draft">0 points</strong>
+                            </article>
+                            <article class="stat-card">
+                                <span class="stat-card__label">Last save</span>
+                                <strong class="stat-card__value" id="stat-last-saved">Nothing yet</strong>
+                            </article>
                         </div>
-                        <button id="clear-paths" class="ghost-danger-button" type="button">Clear all</button>
-                    </div>
 
-                    <ul id="history-list" class="history-list">
-                        <!-- Walk history is rendered here -->
-                    </ul>
-                </section>
+                        <div class="insight-strip">
+                            <div class="insight-chip">
+                                <span class="insight-chip__label">Selection</span>
+                                <strong class="insight-chip__value" id="selection-state">No route selected</strong>
+                            </div>
+                            <div class="insight-chip">
+                                <span class="insight-chip__label">Tracking</span>
+                                <strong class="insight-chip__value" id="tracking-state">GPS idle</strong>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+
+                <details class="detail-panel history-panel surface-card" id="walk-history">
+                    <summary class="detail-panel__summary">
+                        <h3>Saved walks</h3>
+                    </summary>
+
+                    <div class="detail-panel__body">
+                        <div class="panel-heading panel-heading--history">
+                            <button id="clear-paths" class="ghost-danger-button" type="button">Clear all</button>
+                        </div>
+
+                        <ul id="history-list" class="history-list">
+                            <!-- Walk history is rendered here -->
+                        </ul>
+                    </div>
+                </details>
             </aside>
         </main>
     </div>
 
     <div id="overlay" class="overlay" hidden></div>
 
-    <section class="modal popup-menu settings-wrapper" id="settings-popup" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <section class="modal popup-menu settings-wrapper" id="settings-popup" role="dialog" aria-modal="true" aria-labelledby="settings-title" aria-describedby="settings-description">
         <button id="exit-settings-button" class="modal-close" type="button" aria-label="Close settings">×</button>
-        <p class="section-kicker">Preferences</p>
-        <h2 id="settings-title">Tune the experience</h2>
-        <p class="modal-copy">Adjust the look and keep privacy and account controls in one place.</p>
+        <div class="settings-hero">
+            <p class="section-kicker">Preferences</p>
+            <h2 id="settings-title">Settings</h2>
+            <p id="settings-description" class="modal-copy">Fine-tune StepCast for the way you map, save, and sync walks.</p>
+        </div>
 
-        <div class="settings-actions">
-            <button id="dark-mode-toggle" class="secondary-button" type="button" data-theme-toggle>
-                <span data-theme-label>Toggle theme</span>
-            </button>
-            <button id="privacy-policy-button" class="secondary-button" type="button">Privacy Policy</button>
-            <button id="logoutButton" class="ghost-danger-button" type="button" style="display: none;">Logout</button>
+        <div class="settings-summary-grid" aria-label="StepCast summary">
+            <article class="settings-stat">
+                <span>Routes</span>
+                <strong id="settings-route-count">0</strong>
+            </article>
+            <article class="settings-stat">
+                <span>Distance</span>
+                <strong id="settings-distance-total">0.00 km</strong>
+            </article>
+            <article class="settings-stat">
+                <span>Sync</span>
+                <strong id="settings-sync-state">Local</strong>
+            </article>
+        </div>
+
+        <div class="settings-scroll">
+            <section class="settings-section" aria-labelledby="appearance-settings-title">
+                <div class="settings-section__heading">
+                    <span class="settings-section__icon" aria-hidden="true">◐</span>
+                    <div>
+                        <h3 id="appearance-settings-title">Appearance</h3>
+                        <p>Choose the theme and reduce interface motion.</p>
+                    </div>
+                </div>
+
+                <div class="settings-control">
+                    <span class="field-label">Theme</span>
+                    <div class="segmented-control settings-segmented" aria-label="Theme">
+                        <button type="button" data-theme-choice="light">Light</button>
+                        <button type="button" data-theme-choice="dark">Night</button>
+                    </div>
+                </div>
+
+                <label class="settings-switch" for="reduced-motion-toggle">
+                    <span>
+                        <strong>Reduce motion</strong>
+                        <small>Minimize transitions and lift effects.</small>
+                    </span>
+                    <input id="reduced-motion-toggle" type="checkbox">
+                </label>
+            </section>
+
+            <section class="settings-section" aria-labelledby="map-settings-title">
+                <div class="settings-section__heading">
+                    <span class="settings-section__icon" aria-hidden="true">⌖</span>
+                    <div>
+                        <h3 id="map-settings-title">Map defaults</h3>
+                        <p>Set your preferred map style and distance units.</p>
+                    </div>
+                </div>
+
+                <div class="settings-control">
+                    <span class="field-label">Default map style</span>
+                    <div class="segmented-control settings-segmented" aria-label="Default map style">
+                        <button type="button" data-settings-map-type="open">Classic</button>
+                        <button type="button" data-settings-map-type="light">Light</button>
+                        <button type="button" data-settings-map-type="dark">Night</button>
+                        <button type="button" data-settings-map-type="topographic">Topo</button>
+                    </div>
+                </div>
+
+                <div class="settings-control">
+                    <span class="field-label">Distance units</span>
+                    <div class="segmented-control settings-segmented" aria-label="Distance units">
+                        <button type="button" data-distance-unit="metric">Kilometers</button>
+                        <button type="button" data-distance-unit="imperial">Miles</button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="settings-section" aria-labelledby="data-settings-title">
+                <div class="settings-section__heading">
+                    <span class="settings-section__icon" aria-hidden="true">↧</span>
+                    <div>
+                        <h3 id="data-settings-title">Data and privacy</h3>
+                        <p>Move your local library or revisit privacy choices.</p>
+                    </div>
+                </div>
+
+                <div class="settings-actions settings-actions--split">
+                    <button id="export-walks-button" class="secondary-button" type="button">Export library</button>
+                    <button id="import-walks-button" class="secondary-button" type="button">Import library</button>
+                    <input id="import-walks-input" type="file" accept="application/json,.json" hidden>
+                    <button id="reset-cookies-button" class="secondary-button" type="button">Reset cookie choice</button>
+                    <button id="privacy-policy-button" class="secondary-button" type="button">Privacy policy</button>
+                </div>
+            </section>
+
+            <section class="settings-section" aria-labelledby="sync-settings-title">
+                <div class="settings-section__heading">
+                    <span class="settings-section__icon" aria-hidden="true">↻</span>
+                    <div>
+                        <h3 id="sync-settings-title">Account and sync</h3>
+                        <p id="settings-account-status">Cloud sync is not connected.</p>
+                    </div>
+                </div>
+
+                <div class="settings-actions settings-actions--split">
+                    <button id="settings-sync-button" class="primary-button" type="button">Sync now</button>
+                    <button id="settings-connect-button" class="secondary-button" type="button">Open sign-in</button>
+                    <button id="logoutButton" class="ghost-danger-button" type="button" style="display: none;">Logout</button>
+                </div>
+            </section>
         </div>
     </section>
 
     <section id="authPopup" class="modal popup-menu auth-modal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
         <p class="section-kicker">StepCast Sync</p>
-        <h2 id="authTitle">Login</h2>
-        <p id="authDescription" class="modal-copy">Save walks across devices and pull synced route markers when cloud access is available.</p>
+        <h2 id="authTitle">Sign in with Continental ID</h2>
+        <p id="authDescription" class="modal-copy">Use Continental ID to sync complete StepCast routes across devices.</p>
 
         <div id="authFeedback" class="auth-feedback" hidden></div>
         <p id="authStaticMessage" class="auth-static-message" hidden>Cloud sync is not configured in this build. Continue in guest mode to use local-only walks.</p>
 
-        <form id="authForm" class="auth-form">
-            <label for="authEmail">Email</label>
-            <div class="input-shell">
-                <input type="email" id="authEmail" required>
-            </div>
-
-            <label for="authPassword">Password</label>
-            <div class="input-shell">
-                <input type="password" id="authPassword" required>
-            </div>
-
-            <button type="submit" id="authSubmit" class="primary-button">Login</button>
-        </form>
-
-        <p id="toggleAuth" class="auth-toggle">Don't have an account? <a href="#" id="switchToRegister">Sign up</a></p>
-        <p id="toggleAuthBack" class="auth-toggle" style="display: none;">Already have an account? <a href="#" id="switchToLogin">Login</a></p>
+        <div class="auth-actions">
+            <button id="continental-login-button" type="button" class="primary-button">Open Continental ID</button>
+            <p class="auth-toggle">The secure Continental ID login page handles sign-in, sign-up, MFA, OAuth, and passkeys.</p>
+        </div>
 
         <button id="guest-button" class="secondary-button" type="button">Continue in guest mode</button>
     </section>

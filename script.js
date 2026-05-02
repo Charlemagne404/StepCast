@@ -16,15 +16,22 @@ const settingsButton = document.getElementById("settings-button");
 const settingsPopup = document.getElementById("settings-popup");
 const exitSettingsButton = document.getElementById("exit-settings-button");
 const privacyPolicyButton = document.getElementById("privacy-policy-button");
-const authForm = document.getElementById("authForm");
+const settingsRouteCount = document.getElementById("settings-route-count");
+const settingsDistanceTotal = document.getElementById("settings-distance-total");
+const settingsSyncState = document.getElementById("settings-sync-state");
+const settingsAccountStatus = document.getElementById("settings-account-status");
+const settingsSyncButton = document.getElementById("settings-sync-button");
+const settingsConnectButton = document.getElementById("settings-connect-button");
+const exportWalksButton = document.getElementById("export-walks-button");
+const importWalksButton = document.getElementById("import-walks-button");
+const importWalksInput = document.getElementById("import-walks-input");
+const resetCookiesButton = document.getElementById("reset-cookies-button");
+const reducedMotionToggle = document.getElementById("reduced-motion-toggle");
 const authTitle = document.getElementById("authTitle");
 const authDescription = document.getElementById("authDescription");
 const authFeedback = document.getElementById("authFeedback");
 const authStaticMessage = document.getElementById("authStaticMessage");
-const switchToRegisterLink = document.getElementById("switchToRegister");
-const switchToLoginLink = document.getElementById("switchToLogin");
-const toggleAuthText = document.getElementById("toggleAuth");
-const toggleAuthBackText = document.getElementById("toggleAuthBack");
+const continentalLoginButton = document.getElementById("continental-login-button");
 const mapStatusPill = document.getElementById("map-status-pill");
 const statusBanner = document.getElementById("status-banner");
 const statusBannerTitle = document.getElementById("status-banner-title");
@@ -39,24 +46,36 @@ const trackingState = document.getElementById("tracking-state");
 const draftPointCount = document.getElementById("draft-point-count");
 const gpsPointCount = document.getElementById("gps-point-count");
 const themeToggleButtons = Array.from(document.querySelectorAll("[data-theme-toggle]"));
+const themeChoiceButtons = Array.from(document.querySelectorAll("[data-theme-choice]"));
 const mapTypeButtons = Array.from(document.querySelectorAll("[data-map-type]"));
+const settingsMapTypeButtons = Array.from(document.querySelectorAll("[data-settings-map-type]"));
+const distanceUnitButtons = Array.from(document.querySelectorAll("[data-distance-unit]"));
+const mapOptionsMenu = document.querySelector(".map-options-menu");
 
 const localStorageHandler = new LocalStorageHandler();
 const testMap = new Map(localStorageHandler, podcastData);
 const AUTH_STORAGE_KEY = "authToken";
+const MAP_TYPE_STORAGE_KEY = "stepcast:mapType";
+const DISTANCE_UNIT_STORAGE_KEY = "stepcast:distanceUnit";
+const REDUCED_MOTION_STORAGE_KEY = "stepcast:reducedMotion";
 const DEFAULT_LOCAL_API_ORIGIN = "http://127.0.0.1:5002";
+const DEFAULT_CONTINENTAL_LOGIN_URL = "https://login.continental-hub.com/popup.html";
+const DEFAULT_CONTINENTAL_AUTH_API_BASE_URL = "https://auth.continental-hub.com";
 
 let authToken = localStorage.getItem(AUTH_STORAGE_KEY) || "";
-let walkMarkers = [];
+let currentMapType = testMap.mapTypes[localStorage.getItem(MAP_TYPE_STORAGE_KEY)]
+    ? localStorage.getItem(MAP_TYPE_STORAGE_KEY)
+    : "open";
+let currentDistanceUnit = localStorage.getItem(DISTANCE_UNIT_STORAGE_KEY) === "imperial" ? "imperial" : "metric";
 let tracking = false;
 let watchID = null;
 let gpsPath = [];
 let gpsPolyline = null;
 let userMarker;
-let isSignup = false;
 let guestMode = false;
 let flashTimeout = null;
 let statusFlashActive = false;
+let loginPopupWindow = null;
 
 const trimTrailingSlash = (value) => String(value || "").replace(/\/+$/, "");
 const readConfiguredApiBaseUrl = () => trimTrailingSlash(window.__STEPCAST_API_BASE_URL__);
@@ -85,6 +104,8 @@ const resolveApiBaseUrl = () => {
 
 const API_BASE_URL = resolveApiBaseUrl();
 const API_CONFIGURATION_ERROR = "StepCast API is not configured for this deployment. Set window.__STEPCAST_API_BASE_URL__ in config.js to your backend origin.";
+const CONTINENTAL_LOGIN_URL = trimTrailingSlash(window.__CONTINENTAL_LOGIN_URL__ || DEFAULT_CONTINENTAL_LOGIN_URL);
+const CONTINENTAL_AUTH_API_BASE_URL = trimTrailingSlash(window.__CONTINENTAL_AUTH_API_BASE_URL__ || DEFAULT_CONTINENTAL_AUTH_API_BASE_URL);
 let apiAvailable = Boolean(API_BASE_URL);
 
 testMap.showExistingWalks();
@@ -137,6 +158,26 @@ const updateOverlayVisibility = () => {
     overlay.hidden = !shouldShowOverlay;
 };
 
+const updateSettingsControlState = () => {
+    const isDarkMode = document.body.classList.contains("dark-mode");
+
+    for (const button of themeChoiceButtons) {
+        button.classList.toggle("is-active", button.dataset.themeChoice === (isDarkMode ? "dark" : "light"));
+    }
+
+    for (const button of settingsMapTypeButtons) {
+        button.classList.toggle("is-active", button.dataset.settingsMapType === currentMapType);
+    }
+
+    for (const button of distanceUnitButtons) {
+        button.classList.toggle("is-active", button.dataset.distanceUnit === currentDistanceUnit);
+    }
+
+    if (reducedMotionToggle) {
+        reducedMotionToggle.checked = document.body.classList.contains("reduce-motion");
+    }
+};
+
 const updateThemeToggleLabels = () => {
     const isDarkMode = document.body.classList.contains("dark-mode");
     for (const button of themeToggleButtons) {
@@ -145,18 +186,25 @@ const updateThemeToggleLabels = () => {
             label.textContent = isDarkMode ? "Light theme" : "Night theme";
         }
     }
+
+    updateSettingsControlState();
+};
+
+const applyThemePreference = (theme) => {
+    const nextTheme = theme === "dark" ? "dark" : "light";
+    document.body.classList.toggle("dark-mode", nextTheme === "dark");
+    localStorage.setItem("theme", nextTheme);
+    updateThemeToggleLabels();
 };
 
 const toggleDarkMode = () => {
-    document.body.classList.toggle("dark-mode");
+    applyThemePreference(document.body.classList.contains("dark-mode") ? "light" : "dark");
+};
 
-    if (document.body.classList.contains("dark-mode")) {
-        localStorage.setItem("theme", "dark");
-    } else {
-        localStorage.setItem("theme", "light");
-    }
-
-    updateThemeToggleLabels();
+const applyReducedMotionPreference = (isEnabled) => {
+    document.body.classList.toggle("reduce-motion", Boolean(isEnabled));
+    localStorage.setItem(REDUCED_MOTION_STORAGE_KEY, isEnabled ? "true" : "false");
+    updateSettingsControlState();
 };
 
 const clearAuthFeedback = () => {
@@ -169,15 +217,9 @@ const setAuthFeedback = (message) => {
     authFeedback.textContent = message;
 };
 
-const updateAuthMode = (signupMode) => {
-    isSignup = signupMode;
-    authTitle.textContent = signupMode ? "Create Account" : "Login";
-    document.getElementById("authSubmit").textContent = signupMode ? "Create account" : "Login";
-    authDescription.textContent = signupMode
-        ? "Create an account to keep your walks synced across devices when cloud access is enabled."
-        : "Save walks across devices and pull synced route markers when cloud access is available.";
-    toggleAuthText.style.display = signupMode ? "none" : "block";
-    toggleAuthBackText.style.display = signupMode ? "block" : "none";
+const updateAuthMode = () => {
+    authTitle.textContent = "Sign in with Continental ID";
+    authDescription.textContent = "Use Continental ID to sync complete StepCast routes across devices.";
     clearAuthFeedback();
 };
 
@@ -195,6 +237,42 @@ const updateAuthStatusLabel = () => {
     }
 
     authStatusLabel.textContent = guestMode ? "Guest mode" : "Sign-in available";
+};
+
+const getSyncStatusText = () => {
+    if (authToken) {
+        return "Cloud";
+    }
+
+    if (!API_BASE_URL || !apiAvailable) {
+        return "Local-only";
+    }
+
+    return guestMode ? "Guest" : "Available";
+};
+
+const updateSettingsSummary = () => {
+    const walks = localStorageHandler.retrieveWalksFromLocalStorage();
+    const totalDistanceMeters = walks.reduce((sum, walk) => sum + calculateDistanceForPoints(walk.points || []), 0);
+    const syncStatus = getSyncStatusText();
+
+    settingsRouteCount.textContent = String(walks.length);
+    settingsDistanceTotal.textContent = formatDistance(totalDistanceMeters);
+    settingsSyncState.textContent = syncStatus;
+
+    if (authToken) {
+        settingsAccountStatus.textContent = "Cloud sync is connected. Local changes can be synced to your account.";
+    } else if (!API_BASE_URL || !apiAvailable) {
+        settingsAccountStatus.textContent = "Cloud sync is unavailable in this build. Walks stay on this device.";
+    } else {
+        settingsAccountStatus.textContent = guestMode
+            ? "Guest mode is active. Sign in to sync routes across devices."
+            : "Sign in to sync complete routes across devices.";
+    }
+
+    settingsSyncButton.disabled = !authToken || !API_BASE_URL || !apiAvailable;
+    settingsConnectButton.hidden = Boolean(authToken) || !API_BASE_URL || !apiAvailable;
+    updateSettingsControlState();
 };
 
 const showLoggedInUi = () => {
@@ -233,6 +311,7 @@ const activateGuestMode = () => {
 };
 
 const openSettings = () => {
+    updateSettingsSummary();
     settingsPopup.style.display = "flex";
     updateOverlayVisibility();
 };
@@ -266,7 +345,13 @@ const calculateDistanceForPoints = (points = []) => {
     return distance;
 };
 
-const formatDistance = (meters) => `${(meters / 1000).toFixed(2)} km`;
+const formatDistance = (meters) => {
+    if (currentDistanceUnit === "imperial") {
+        return `${(meters / 1609.344).toFixed(2)} mi`;
+    }
+
+    return `${(meters / 1000).toFixed(2)} km`;
+};
 
 const formatTimestamp = (value) => {
     if (!value) {
@@ -281,10 +366,15 @@ const formatTimestamp = (value) => {
     }).format(new Date(value));
 };
 
+const setStatusBannerVisibility = (isVisible) => {
+    statusBanner.hidden = !isVisible;
+};
+
 const applyStatus = ({ title, body, tone = "default" }) => {
     statusBanner.dataset.tone = tone;
     statusBannerTitle.textContent = title;
     statusBannerBody.textContent = body;
+    setStatusBannerVisibility(true);
 };
 
 const getAmbientStatus = () => {
@@ -329,9 +419,16 @@ const getAmbientStatus = () => {
 };
 
 const renderAmbientStatus = () => {
-    if (!statusFlashActive) {
-        applyStatus(getAmbientStatus());
+    if (statusFlashActive) {
+        return;
     }
+
+    if (tracking) {
+        applyStatus(getAmbientStatus());
+        return;
+    }
+
+    setStatusBannerVisibility(false);
 };
 
 const flashStatus = ({ title, body, tone = "default" }, duration = 3600) => {
@@ -386,6 +483,7 @@ const syncInterface = () => {
     document.getElementById("toggleTracking").textContent = tracking ? "Stop live tracking" : "Start live tracking";
 
     updateAuthStatusLabel();
+    updateSettingsSummary();
     renderAmbientStatus();
 };
 
@@ -393,14 +491,138 @@ const setActiveMapType = (mapType) => {
     for (const button of mapTypeButtons) {
         button.classList.toggle("is-active", button.dataset.mapType === mapType);
     }
+
+    for (const button of settingsMapTypeButtons) {
+        button.classList.toggle("is-active", button.dataset.settingsMapType === mapType);
+    }
+};
+
+const getMapTypeLabel = (mapType) => {
+    const matchingButton = [...mapTypeButtons, ...settingsMapTypeButtons]
+        .find((button) => button.dataset.mapType === mapType || button.dataset.settingsMapType === mapType);
+    return matchingButton?.textContent?.trim() || "Selected";
+};
+
+const applyMapType = (mapType, { announce = false, closeOptions = false } = {}) => {
+    if (!testMap.mapTypes[mapType]) {
+        return;
+    }
+
+    currentMapType = mapType;
+    localStorage.setItem(MAP_TYPE_STORAGE_KEY, mapType);
+    testMap.changeMapType(mapType);
+    setActiveMapType(mapType);
+    updateSettingsControlState();
+
+    if (closeOptions && mapOptionsMenu) {
+        mapOptionsMenu.open = false;
+    }
+
+    if (announce) {
+        flashStatus({
+            title: `${getMapTypeLabel(mapType)} map active`,
+            body: "The map style was saved as your default without affecting routes.",
+            tone: "default",
+        });
+    }
+};
+
+const applyDistanceUnit = (unit) => {
+    currentDistanceUnit = unit === "imperial" ? "imperial" : "metric";
+    localStorage.setItem(DISTANCE_UNIT_STORAGE_KEY, currentDistanceUnit);
+    testMap.showExistingWalks();
+    syncInterface();
+    flashStatus({
+        title: currentDistanceUnit === "imperial" ? "Miles enabled" : "Kilometers enabled",
+        body: "Distances in stats and saved walks now use your selected unit.",
+        tone: "default",
+    });
+};
+
+const exportWalkLibrary = () => {
+    const walks = localStorageHandler.retrieveWalksFromLocalStorage();
+    const payload = {
+        app: "StepCast",
+        exportedAt: new Date().toISOString(),
+        walks,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const objectUrl = URL.createObjectURL(blob);
+    const downloadLink = document.createElement("a");
+    downloadLink.href = objectUrl;
+    downloadLink.download = `stepcast-walks-${new Date().toISOString().slice(0, 10)}.json`;
+    downloadLink.click();
+    URL.revokeObjectURL(objectUrl);
+
+    flashStatus({
+        title: "Library exported",
+        body: `${walks.length} route${walks.length === 1 ? "" : "s"} prepared as a JSON backup.`,
+        tone: "success",
+    });
+};
+
+const importWalkLibrary = async (file) => {
+    if (!file) {
+        return;
+    }
+
+    try {
+        const payload = JSON.parse(await file.text());
+        const importedWalks = Array.isArray(payload) ? payload : payload.walks;
+
+        if (!Array.isArray(importedWalks)) {
+            throw new Error("Choose a StepCast JSON export or an array of walks.");
+        }
+
+        const beforeCount = localStorageHandler.retrieveWalksFromLocalStorage().length;
+        localStorageHandler.mergeWalksIntoLocalStorage(importedWalks);
+        const afterCount = localStorageHandler.retrieveWalksFromLocalStorage().length;
+        testMap.showExistingWalks();
+        syncInterface();
+
+        flashStatus({
+            title: "Library imported",
+            body: `${Math.max(afterCount - beforeCount, 0)} new route${afterCount - beforeCount === 1 ? "" : "s"} added or updated locally.`,
+            tone: "success",
+        });
+    } catch (error) {
+        console.error("Library import failed:", error);
+        flashStatus({
+            title: "Import failed",
+            body: error.message || "StepCast could not read that library file.",
+            tone: "danger",
+        });
+    } finally {
+        importWalksInput.value = "";
+    }
+};
+
+const resetCookieChoice = () => {
+    localStorage.removeItem("cookiesAccepted");
+    const cookiePopup = document.getElementById("cookie-popup");
+    if (cookiePopup) {
+        cookiePopup.style.display = "block";
+    }
+
+    flashStatus({
+        title: "Cookie choice reset",
+        body: "The cookie notice will appear again so you can review it.",
+        tone: "default",
+    });
+};
+
+const openAuthFromSettings = () => {
+    closeSettings();
+    configureAuthPopupAvailability();
+    authPopup.style.display = "flex";
+    updateOverlayVisibility();
 };
 
 const configureAuthPopupAvailability = () => {
     const localOnly = !API_BASE_URL || !apiAvailable;
     authPopup.classList.toggle("auth-modal--local-only", localOnly);
     authStaticMessage.hidden = !localOnly;
-    toggleAuthText.hidden = localOnly;
-    toggleAuthBackText.hidden = localOnly;
+    continentalLoginButton.disabled = localOnly;
 
     if (localOnly) {
         authTitle.textContent = "Local Mode";
@@ -410,57 +632,7 @@ const configureAuthPopupAvailability = () => {
         return;
     }
 
-    toggleAuthText.hidden = false;
-    toggleAuthBackText.hidden = false;
-    updateAuthMode(isSignup);
-};
-
-const clearWalkMarkers = () => {
-    for (const marker of walkMarkers) {
-        testMap.map.removeLayer(marker);
-    }
-
-    walkMarkers = [];
-};
-
-const fetchWalks = async () => {
-    try {
-        if (!API_BASE_URL || !authToken) {
-            clearWalkMarkers();
-            return;
-        }
-
-        const { response, data } = await apiRequest("/api/location", {
-            method: "GET",
-        });
-
-        if (!response.ok) {
-            throw new Error(data.message || "Failed to fetch walk data");
-        }
-
-        clearWalkMarkers();
-
-        data.forEach((walk) => {
-            const marker = L.circle([walk.latitude, walk.longitude], {
-                color: "#c44d17",
-                fillColor: "#ea6c2f",
-                fillOpacity: 0.4,
-                radius: 10,
-            }).addTo(testMap.map);
-
-            walkMarkers.push(marker);
-        });
-    } catch (error) {
-        console.error("Error fetching walk data:", error);
-        if (error instanceof TypeError) {
-            markBackendUnavailable();
-        }
-        flashStatus({
-            title: "Could not load synced walks",
-            body: error.message || "Remote walk markers could not be loaded right now.",
-            tone: "warning",
-        });
-    }
+    updateAuthMode();
 };
 
 const sendApiRequest = async (path, { method = "GET", body, auth = true } = {}) => {
@@ -485,27 +657,67 @@ const sendApiRequest = async (path, { method = "GET", body, auth = true } = {}) 
     return { response, data };
 };
 
-const refreshAuthSession = async () => {
-    try {
-        const { response, data } = await sendApiRequest("/api/auth/refresh_token", {
-            method: "POST",
-            auth: false,
-        });
+const sendContinentalAuthRequest = async (path, { method = "GET", body } = {}) => {
+    const headers = {};
 
-        const nextToken = data.accessToken || data.token;
-        if (response.ok && nextToken) {
-            setAuthToken(nextToken);
-            return true;
-        }
-    } catch (error) {
-        console.error("Session refresh failed:", error);
-        if (error instanceof TypeError) {
-            markBackendUnavailable();
+    if (body !== undefined) {
+        headers["Content-Type"] = "application/json";
+    }
+
+    const response = await fetch(`${CONTINENTAL_AUTH_API_BASE_URL}${path}`, {
+        method,
+        headers,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+        credentials: "include",
+    });
+
+    const data = await parseResponseBody(response);
+    return { response, data };
+};
+
+const refreshAuthSession = async () => {
+    const refreshRequests = [
+        () => sendContinentalAuthRequest("/api/auth/refresh_token", { method: "POST" }),
+        () => sendApiRequest("/api/auth/refresh_token", { method: "POST", auth: false }),
+    ];
+
+    for (const [requestIndex, requestRefresh] of refreshRequests.entries()) {
+        try {
+            const { response, data } = await requestRefresh();
+            const nextToken = data.accessToken || data.token;
+            if (response.ok && nextToken) {
+                setAuthToken(nextToken);
+                return true;
+            }
+        } catch (error) {
+            console.warn("Session refresh failed:", error);
+            if (requestIndex > 0 && error instanceof TypeError) {
+                markBackendUnavailable();
+            }
         }
     }
 
     setAuthToken("");
     return false;
+};
+
+const logoutContinentalSession = async () => {
+    try {
+        await sendContinentalAuthRequest("/api/auth/logout", {
+            method: "POST",
+        });
+    } catch (error) {
+        console.error("Continental logout failed:", error);
+    }
+
+    try {
+        await sendApiRequest("/api/auth/logout", {
+            method: "POST",
+            auth: false,
+        });
+    } catch (error) {
+        console.error("StepCast auth proxy logout failed:", error);
+    }
 };
 
 const apiRequest = async (path, options = {}) => {
@@ -522,6 +734,147 @@ const apiRequest = async (path, options = {}) => {
     }
 
     return result;
+};
+
+const syncWalkToCloud = async (walk, { silent = false } = {}) => {
+    if (!walk || !API_BASE_URL || !apiAvailable || !authToken) {
+        return false;
+    }
+
+    try {
+        const { response, data } = await apiRequest("/api/location", {
+            method: "POST",
+            body: localStorageHandler.sanitizeWalk(walk),
+        });
+
+        if (!response.ok) {
+            throw new Error(data.message || "Failed to sync walk.");
+        }
+
+        return true;
+    } catch (error) {
+        console.error("Cloud walk sync failed:", error);
+        if (error instanceof TypeError) {
+            markBackendUnavailable();
+        }
+        if (!silent) {
+            flashStatus({
+                title: "Cloud sync failed",
+                body: error.message || "The walk was saved locally but could not be synced yet.",
+                tone: "warning",
+            });
+        }
+        return false;
+    }
+};
+
+const deleteWalkFromCloud = async (walk, { silent = false } = {}) => {
+    const walkId = String(walk?.id || walk?.clientId || "").trim();
+    if (!walkId || !API_BASE_URL || !apiAvailable || !authToken) {
+        return false;
+    }
+
+    try {
+        const { response, data } = await apiRequest(`/api/location/${encodeURIComponent(walkId)}`, {
+            method: "DELETE",
+        });
+
+        if (!response.ok) {
+            throw new Error(data.message || "Failed to delete synced walk.");
+        }
+
+        return true;
+    } catch (error) {
+        console.error("Cloud walk delete failed:", error);
+        if (error instanceof TypeError) {
+            markBackendUnavailable();
+        }
+        if (!silent) {
+            flashStatus({
+                title: "Cloud delete failed",
+                body: error.message || "The walk was removed locally but could not be removed from cloud sync.",
+                tone: "warning",
+            });
+        }
+        return false;
+    }
+};
+
+const clearCloudWalks = async ({ silent = false } = {}) => {
+    if (!API_BASE_URL || !apiAvailable || !authToken) {
+        return false;
+    }
+
+    try {
+        const { response, data } = await apiRequest("/api/location", {
+            method: "DELETE",
+        });
+
+        if (!response.ok) {
+            throw new Error(data.message || "Failed to clear synced walks.");
+        }
+
+        return true;
+    } catch (error) {
+        console.error("Cloud library clear failed:", error);
+        if (error instanceof TypeError) {
+            markBackendUnavailable();
+        }
+        if (!silent) {
+            flashStatus({
+                title: "Cloud clear failed",
+                body: error.message || "Local walks were cleared but the synced library could not be cleared.",
+                tone: "warning",
+            });
+        }
+        return false;
+    }
+};
+
+const synchronizeCloudWalks = async ({ announce = false } = {}) => {
+    if (!API_BASE_URL || !apiAvailable || !authToken) {
+        return false;
+    }
+
+    try {
+        for (const walk of localStorageHandler.retrieveWalksFromLocalStorage()) {
+            await syncWalkToCloud(walk, { silent: true });
+        }
+
+        const { response, data } = await apiRequest("/api/location", {
+            method: "GET",
+        });
+
+        if (!response.ok) {
+            throw new Error(data.message || "Failed to load synced walks.");
+        }
+
+        const remoteWalks = Array.isArray(data) ? data : [];
+        localStorageHandler.mergeWalksIntoLocalStorage(remoteWalks);
+        testMap.showExistingWalks();
+        syncInterface();
+
+        if (announce) {
+            flashStatus({
+                title: "Cloud sync complete",
+                body: `${remoteWalks.length} synced route${remoteWalks.length === 1 ? "" : "s"} checked against this device.`,
+                tone: "success",
+            });
+        }
+
+        return true;
+    } catch (error) {
+        console.error("Cloud sync failed:", error);
+        if (error instanceof TypeError) {
+            markBackendUnavailable();
+        }
+        flashStatus({
+            title: "Could not sync walks",
+            body: error.message || "Remote walks could not be loaded right now.",
+            tone: "warning",
+        });
+        return false;
+    }
 };
 
 const verifyCurrentSession = async () => {
@@ -567,6 +920,88 @@ const restoreAuthSession = async () => {
 
     showLoggedOutUi();
     return false;
+};
+
+const buildContinentalLoginUrl = () => {
+    const loginUrl = new URL(CONTINENTAL_LOGIN_URL, window.location.href);
+    loginUrl.searchParams.set("origin", window.location.origin);
+    loginUrl.searchParams.set("redirect", window.location.href);
+    loginUrl.searchParams.set("apiBaseUrl", CONTINENTAL_AUTH_API_BASE_URL);
+    return loginUrl;
+};
+
+const getContinentalLoginOrigin = () => {
+    try {
+        return new URL(CONTINENTAL_LOGIN_URL, window.location.href).origin;
+    } catch {
+        return "";
+    }
+};
+
+const getTrustedContinentalMessageOrigins = () => {
+    const origins = new Set();
+    const loginOrigin = getContinentalLoginOrigin();
+    if (loginOrigin) {
+        origins.add(loginOrigin);
+    }
+
+    try {
+        origins.add(new URL(CONTINENTAL_AUTH_API_BASE_URL).origin);
+    } catch {
+        // Ignore invalid optional auth API configuration.
+    }
+
+    return origins;
+};
+
+const openContinentalLogin = () => {
+    if (!API_BASE_URL || !apiAvailable) {
+        setAuthFeedback(API_CONFIGURATION_ERROR);
+        return;
+    }
+
+    clearAuthFeedback();
+    const loginUrl = buildContinentalLoginUrl();
+    loginPopupWindow = window.open(
+        loginUrl.toString(),
+        "stepcast-continental-id",
+        "popup,width=520,height=760",
+    );
+
+    if (!loginPopupWindow) {
+        window.location.href = loginUrl.toString();
+        return;
+    }
+
+    loginPopupWindow.focus();
+    setAuthFeedback("Complete sign-in in the Continental ID window. StepCast will continue automatically.");
+};
+
+const handleContinentalLoginMessage = async (event) => {
+    if (!getTrustedContinentalMessageOrigins().has(event.origin)) {
+        return;
+    }
+
+    const payload = event.data || {};
+    if (payload.type !== "LOGIN_SUCCESS") {
+        return;
+    }
+
+    const nextToken = payload.accessToken || payload.token;
+    if (!nextToken) {
+        setAuthFeedback("Continental ID did not return an active session.");
+        return;
+    }
+
+    setAuthToken(nextToken);
+    loginPopupWindow = null;
+    showLoggedInUi();
+    await synchronizeCloudWalks({ announce: true });
+    flashStatus({
+        title: "Signed in",
+        body: "Continental ID is connected and route sync is active.",
+        tone: "success",
+    });
 };
 
 const clearTemporaryGpsRoute = () => {
@@ -718,7 +1153,8 @@ testMap.map.on("click", (event) => {
 });
 
 saveWalkButton.addEventListener("click", async () => {
-    await testMap.createSaveShowWalk();
+    const savedWalk = await testMap.createSaveShowWalk();
+    await syncWalkToCloud(savedWalk);
     syncInterface();
 });
 
@@ -735,13 +1171,15 @@ saveGPSWalkButton.addEventListener("click", async () => {
         return;
     }
 
+    await syncWalkToCloud(didSave);
+
     gpsPath = [];
     clearTemporaryGpsRoute();
     podcastNameInput.value = "";
     syncInterface();
 });
 
-clearWalksButton.addEventListener("click", () => {
+clearWalksButton.addEventListener("click", async () => {
     const savedWalks = localStorageHandler.retrieveWalksFromLocalStorage();
     if (savedWalks.length === 0) {
         flashStatus({
@@ -756,24 +1194,44 @@ clearWalksButton.addEventListener("click", () => {
         return;
     }
 
+    const clearCloud = Boolean(authToken);
     localStorageHandler.clearLocalStorage();
     testMap.showExistingWalks();
+    if (clearCloud) {
+        await clearCloudWalks();
+    }
     flashStatus({
         title: "Walk library cleared",
-        body: "All saved local walks were removed from this device.",
+        body: clearCloud
+            ? "All saved walks were removed from this device and cloud sync."
+            : "All saved local walks were removed from this device.",
         tone: "success",
     });
 });
 
-undoButton.addEventListener("click", () => {
+undoButton.addEventListener("click", async () => {
+    const previousWalkIds = new Set(localStorageHandler.retrieveWalksFromLocalStorage().map((walk) => walk.id));
     testMap.undo();
+    const nextWalkIds = new Set(localStorageHandler.retrieveWalksFromLocalStorage().map((walk) => walk.id));
+    for (const removedWalkId of previousWalkIds) {
+        if (!nextWalkIds.has(removedWalkId)) {
+            await deleteWalkFromCloud({ id: removedWalkId }, { silent: true });
+        }
+    }
     syncInterface();
 });
 
-document.addEventListener("keydown", (event) => {
+document.addEventListener("keydown", async (event) => {
     if ((event.ctrlKey || event.metaKey) && event.key === "z") {
         event.preventDefault();
+        const previousWalkIds = new Set(localStorageHandler.retrieveWalksFromLocalStorage().map((walk) => walk.id));
         testMap.undo();
+        const nextWalkIds = new Set(localStorageHandler.retrieveWalksFromLocalStorage().map((walk) => walk.id));
+        for (const removedWalkId of previousWalkIds) {
+            if (!nextWalkIds.has(removedWalkId)) {
+                await deleteWalkFromCloud({ id: removedWalkId }, { silent: true });
+            }
+        }
         syncInterface();
     }
 
@@ -781,6 +1239,7 @@ document.addEventListener("keydown", (event) => {
         const removedWalk = testMap.selectedWalk;
         localStorageHandler.removeWalkFromLocalStorage(removedWalk);
         testMap.showExistingWalks();
+        await deleteWalkFromCloud(removedWalk);
         flashStatus({
             title: "Walk deleted",
             body: `${removedWalk?.podcastName || "The selected route"} was removed from your library.`,
@@ -789,7 +1248,9 @@ document.addEventListener("keydown", (event) => {
     }
 
     if (event.key === "Enter" && document.activeElement === podcastNameInput && !saveWalkButton.disabled) {
-        testMap.createSaveShowWalk().then(() => syncInterface());
+        const savedWalk = await testMap.createSaveShowWalk();
+        await syncWalkToCloud(savedWalk);
+        syncInterface();
     }
 
     if (event.key === "Escape" && settingsPopup.style.display === "flex") {
@@ -800,9 +1261,14 @@ document.addEventListener("keydown", (event) => {
 document.addEventListener("click", (event) => {
     const clickedHistoryItem = event.target.closest(".history-item");
     const clickedModal = event.target.closest(".modal");
+    const clickedMapOptionsMenu = event.target.closest(".map-options-menu");
 
     if (!testMap.cursorHoversMap && !clickedHistoryItem && !clickedModal && testMap.selectedWalk) {
         testMap.deselectWalk(testMap.selectedWalk, testMap.getWalkColor(testMap.selectedWalk));
+    }
+
+    if (mapOptionsMenu && !clickedMapOptionsMenu) {
+        mapOptionsMenu.open = false;
     }
 });
 
@@ -811,6 +1277,13 @@ exitSettingsButton.addEventListener("click", closeSettings);
 privacyPolicyButton.addEventListener("click", () => {
     window.location.href = "privacy-policy.html";
 });
+settingsSyncButton.addEventListener("click", () => synchronizeCloudWalks({ announce: true }));
+settingsConnectButton.addEventListener("click", openAuthFromSettings);
+exportWalksButton.addEventListener("click", exportWalkLibrary);
+importWalksButton.addEventListener("click", () => importWalksInput.click());
+importWalksInput.addEventListener("change", () => importWalkLibrary(importWalksInput.files?.[0]));
+resetCookiesButton.addEventListener("click", resetCookieChoice);
+reducedMotionToggle.addEventListener("change", () => applyReducedMotionPreference(reducedMotionToggle.checked));
 
 overlay.addEventListener("click", () => {
     if (settingsPopup.style.display === "flex") {
@@ -819,6 +1292,7 @@ overlay.addEventListener("click", () => {
 });
 
 guestButton.addEventListener("click", activateGuestMode);
+continentalLoginButton.addEventListener("click", openContinentalLogin);
 document.getElementById("toggleTracking").addEventListener("click", toggleTracking);
 podcastNameInput.addEventListener("input", syncInterface);
 
@@ -826,101 +1300,38 @@ for (const button of themeToggleButtons) {
     button.addEventListener("click", toggleDarkMode);
 }
 
-for (const button of mapTypeButtons) {
+for (const button of themeChoiceButtons) {
     button.addEventListener("click", () => {
-        const { mapType } = button.dataset;
-        if (!mapType) {
-            return;
-        }
-
-        testMap.changeMapType(mapType);
-        setActiveMapType(mapType);
-        flashStatus({
-            title: `${button.textContent} map active`,
-            body: "The map style was updated without affecting your saved routes.",
-            tone: "default",
-        });
+        applyThemePreference(button.dataset.themeChoice);
     });
 }
 
-switchToRegisterLink.addEventListener("click", (event) => {
-    event.preventDefault();
-    updateAuthMode(true);
-});
+for (const button of mapTypeButtons) {
+    button.addEventListener("click", () => {
+        const { mapType } = button.dataset;
+        applyMapType(mapType, { announce: true, closeOptions: true });
+    });
+}
 
-switchToLoginLink.addEventListener("click", (event) => {
-    event.preventDefault();
-    updateAuthMode(false);
-});
+for (const button of settingsMapTypeButtons) {
+    button.addEventListener("click", () => {
+        applyMapType(button.dataset.settingsMapType, { announce: true });
+    });
+}
 
-authForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    clearAuthFeedback();
-
-    if (!API_BASE_URL) {
-        setAuthFeedback(API_CONFIGURATION_ERROR);
-        return;
-    }
-
-    const email = document.getElementById("authEmail").value.trim();
-    const password = document.getElementById("authPassword").value;
-    const endpoint = isSignup ? "/api/auth/register" : "/api/auth/login";
-
-    try {
-        const { response, data } = await apiRequest(endpoint, {
-            method: "POST",
-            auth: false,
-            retryOn401: false,
-            body: { email, password },
-        });
-
-        if (!response.ok) {
-            throw new Error(data.message || `${isSignup ? "Sign-up" : "Login"} failed`);
-        }
-
-        const nextToken = data.accessToken || data.token;
-        if (nextToken) {
-            setAuthToken(nextToken);
-            authForm.reset();
-            showLoggedInUi();
-            await fetchWalks();
-            flashStatus({
-                title: "Signed in",
-                body: "Cloud sync is enabled for this session.",
-                tone: "success",
-            });
-            return;
-        }
-
-        if (isSignup) {
-            updateAuthMode(false);
-            setAuthFeedback(data.message || "Registration complete. Verify your email, then log in.");
-            return;
-        }
-
-        throw new Error("Continental ID did not return an active session.");
-    } catch (error) {
-        console.error(error);
-        if (error instanceof TypeError || String(error.message || "").includes("Failed to fetch")) {
-            markBackendUnavailable();
-            setAuthFeedback("Cloud sync is unavailable right now. Continue in guest mode to keep using local walks.");
-            return;
-        }
-        setAuthFeedback(error.message || `${isSignup ? "Sign-up" : "Login"} failed. Please check your credentials.`);
-    }
-});
+for (const button of distanceUnitButtons) {
+    button.addEventListener("click", () => {
+        applyDistanceUnit(button.dataset.distanceUnit);
+    });
+}
 
 logoutButton.addEventListener("click", async () => {
     try {
-        await sendApiRequest("/api/auth/logout", {
-            method: "POST",
-            auth: false,
-        });
+        await logoutContinentalSession();
     } catch (error) {
         console.error("Logout failed:", error);
     } finally {
         setAuthToken("");
-        clearWalkMarkers();
         showLoggedOutUi();
         flashStatus({
             title: "Signed out",
@@ -931,6 +1342,9 @@ logoutButton.addEventListener("click", async () => {
 });
 
 window.addEventListener("stepcast:ui-updated", syncInterface);
+window.addEventListener("stepcast:walk-deleted", (event) => {
+    deleteWalkFromCloud(event.detail?.walk);
+});
 window.addEventListener("stepcast:status", (event) => {
     const detail = event.detail || {};
     flashStatus({
@@ -939,20 +1353,22 @@ window.addEventListener("stepcast:status", (event) => {
         tone: detail.tone || "default",
     });
 });
+window.addEventListener("message", handleContinentalLoginMessage);
 
 if (localStorage.getItem("theme") === "dark") {
     document.body.classList.add("dark-mode");
 }
 
+applyReducedMotionPreference(localStorage.getItem(REDUCED_MOTION_STORAGE_KEY) === "true");
 populatePodcastSuggestions();
 updateThemeToggleLabels();
-updateAuthMode(false);
+updateAuthMode();
 configureAuthPopupAvailability();
-setActiveMapType("open");
+applyMapType(currentMapType);
 syncInterface();
 
 restoreAuthSession().then((authenticated) => {
     if (authenticated) {
-        fetchWalks();
+        synchronizeCloudWalks();
     }
 });

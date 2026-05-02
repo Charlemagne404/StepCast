@@ -17,6 +17,14 @@ const emitStatus = (title, message, tone = "default") => {
     }));
 };
 
+const emitWalkDeleted = (walk) => {
+    window.dispatchEvent(new CustomEvent("stepcast:walk-deleted", {
+        detail: {
+            walk,
+        },
+    }));
+};
+
 export class Map {
     constructor(localStorageHandler, podcastList) {
         this.mapTypes = {
@@ -26,9 +34,14 @@ export class Map {
             topographic: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
         };
 
-        this.map = L.map("map").setView([59.3293, 18.0686], 10);
+        this.map = L.map("map", {
+            zoomControl: false,
+        }).setView([59.3293, 18.0686], 10);
         this.baseLayer = L.tileLayer(this.mapTypes.open, {
             maxZoom: 20,
+        }).addTo(this.map);
+        L.control.zoom({
+            position: "topright",
         }).addTo(this.map);
 
         this.markers = [];
@@ -86,6 +99,14 @@ export class Map {
         }
 
         return distance;
+    }
+
+    formatWalkDistance(meters) {
+        if (localStorage.getItem("stepcast:distanceUnit") === "imperial") {
+            return `${(meters / 1609.344).toFixed(2)} mi`;
+        }
+
+        return `${(meters / 1000).toFixed(2)} km`;
     }
 
     formatWalkDate(value) {
@@ -167,7 +188,7 @@ export class Map {
                         </div>
                     </div>
                     <div class="history-card__metrics">
-                        <span class="history-metric">${(distance / 1000).toFixed(2)} km</span>
+                        <span class="history-metric">${this.formatWalkDistance(distance)}</span>
                         <span class="history-metric">${(walk.points || []).length} points</span>
                     </div>
                     <div class="history-card__actions">
@@ -218,6 +239,7 @@ export class Map {
             event.stopPropagation();
             this.localStorageHandler.removeWalkFromLocalStorage(walk);
             this.showExistingWalks();
+            emitWalkDeleted(walk);
             emitStatus("Walk deleted", `${walk.podcastName} was removed from your library.`, "warning");
         });
 
@@ -427,6 +449,7 @@ export class Map {
             this.localStorageHandler.removeWalkFromLocalStorage({ id: lastAction.walkId });
             this.sessionActions.pop();
             this.showExistingWalks();
+            emitWalkDeleted(walkToRemove);
             emitStatus("Last save removed", `${walkToRemove.podcastName} was removed from your library.`, "warning");
         }
     }
@@ -479,6 +502,6 @@ export class Map {
         });
         this.showExistingWalks();
         emitStatus("Walk saved", `${newWalk.podcastName} was added to your library.`, "success");
-        return true;
+        return newWalk;
     }
 }
