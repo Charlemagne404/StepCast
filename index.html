@@ -3,93 +3,226 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Walk Tracker</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <meta name="description" content="StepCast helps you turn podcast listening into mapped walks you can save, revisit, and sync.">
+    <title>StepCast</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css">
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="manifest.json">
-
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="icon" type="image/x-icon" href="icons/dark mode icon.png">
-    <link href="https://fonts.googleapis.com/css2?family=Concert+One&family=Nerko+One&family=Rubik:ital,wght@0,300..900;1,300..900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="wrapper">
-        <div id="map"></div>
+    <div class="ambient-orb ambient-orb--warm" aria-hidden="true"></div>
+    <div class="ambient-orb ambient-orb--cool" aria-hidden="true"></div>
 
-        <div class="settings-wrapper popup-menu" id="settings-popup">
-            <button id="exit-settings-button">X</button>
-            <h1>Settings</h1>
-            
-            <button id="dark-mode-toggle">Toggle Dark Mode</button>
-            <button id="privacy-policy-button">Privacy Policy</button>
-            <button id="logoutButton" style="display: none;">Logout</button>
+    <div class="app-shell">
+        <header class="app-header surface-card">
+            <div class="brand-block">
+                <div class="brand-mark">
+                    <img src="icons/192_logo.png" alt="StepCast logo">
+                </div>
+                <div class="brand-copy">
+                    <p class="section-kicker">Podcast Walking Atlas</p>
+                    <h1>StepCast</h1>
+                    <p class="brand-subtitle">Map every episode to a route worth remembering.</p>
+                </div>
+            </div>
 
-            <script>
-                document.getElementById('privacy-policy-button').addEventListener('click', function() {
-                    window.location.href = 'privacy-policy.html';  // Link to your privacy policy page
-                });
-            </script>
-            
-        </div>
-
-        <div id="scaler"></div>
-
-        <div class="workarea-wrapper" id="workarea-wrapper">
-            <div class="left-bar">
-                <button id="undo-btn">
-                    <img src="./icons/undo-circular-arrow.png" width="20px" height="20px">
+            <div class="header-actions">
+                <button class="icon-button" type="button" data-theme-toggle aria-label="Toggle color theme">
+                    <span class="icon-button__glyph">◐</span>
+                    <span class="icon-button__label" data-theme-label>Theme</span>
                 </button>
-
-                <button id="settings-button">⚙️</button>
+                <button id="settings-button" class="secondary-button" type="button">Settings</button>
             </div>
+        </header>
 
-            
-            <div class="tracking-container">
-                <button id="toggleTracking">Start Tracking</button>
-                <button id="save-gps-walk">Save GPS Walk</button>
-            </div>
-        
-            <div class="input-container">
-                <label for="podcast-input">Podcast Name: </label>
-                <input type="text" id="podcast-input" placeholder="Enter Podcast Name...">
-                <button id="save-walk">Save Walk</button>
-            </div>
-        
-            <div id="walk-history">
-                <h3>Walk History</h3>
-                <ul id="history-list">
-                    <!-- Walk history will appear here -->
-                </ul>
-            </div>
-        
-            <button id="clear-paths">Clear Walks</button>
-        </div>
+        <main class="dashboard">
+            <section class="map-stage surface-card">
+                <div class="map-stage__header">
+                    <div>
+                        <p class="section-kicker">Map Studio</p>
+                        <h2>Build a route by hand or let GPS trace it live.</h2>
+                    </div>
 
-        <div id="overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5);"></div>
+                    <div class="map-stage__stats">
+                        <span class="status-pill" id="map-status-pill">Ready to plot</span>
+                        <span class="micro-stat"><strong id="draft-point-count">0</strong> draft pins</span>
+                        <span class="micro-stat"><strong id="gps-point-count">0</strong> GPS points</span>
+                    </div>
+                </div>
 
-        <div id="authPopup" class="popup-menu">
-            <h1 id="authTitle">Login</h1>
-            
-            <form id="authForm">
-                <label for="authEmail">Email:</label>
-                <input type="email" id="authEmail" required>
-                <label for="authPassword">Password:</label>
-                <input type="password" id="authPassword" required>
-                <button type="submit" id="authSubmit">Login</button>
-            </form>
+                <div class="map-toolbar">
+                    <div class="segmented-control" aria-label="Map style">
+                        <button class="map-type-button is-active" type="button" data-map-type="open">Classic</button>
+                        <button class="map-type-button" type="button" data-map-type="light">Light</button>
+                        <button class="map-type-button" type="button" data-map-type="dark">Night</button>
+                        <button class="map-type-button" type="button" data-map-type="topographic">Topo</button>
+                    </div>
 
-            <p id="toggleAuth">Don't have an account? <a href="#" id="switchToRegister">Sign up</a></p>
-            <p id="toggleAuthBack" style="display: none;">Already have an account? <a href="#" id="switchToLogin">Login</a></p>
+                    <div class="map-toolbar__meta">
+                        <span id="auth-status-label" class="connection-pill">Guest mode</span>
+                    </div>
+                </div>
 
-            <button id="guest-button">Guest</button>
-        </div>
+                <div class="map-frame">
+                    <div class="floating-rail">
+                        <button id="undo-btn" class="icon-button icon-button--stacked" type="button" aria-label="Undo last action">
+                            <img src="./icons/undo-circular-arrow.png" width="20" height="20" alt="">
+                            <span class="icon-button__label">Undo</span>
+                        </button>
+                    </div>
 
+                    <div id="map"></div>
+
+                    <div class="status-banner" id="status-banner" data-tone="default">
+                        <p class="status-banner__title" id="status-banner-title">Ready to map</p>
+                        <p class="status-banner__body" id="status-banner-body">Drop pins for a manual route or start GPS tracking for a live walk.</p>
+                    </div>
+                </div>
+            </section>
+
+            <aside class="control-column">
+                <section class="overview-panel surface-card">
+                    <div class="panel-heading">
+                        <div>
+                            <p class="section-kicker">Overview</p>
+                            <h3>Keep the session in view</h3>
+                        </div>
+                    </div>
+
+                    <div class="stat-grid">
+                        <article class="stat-card">
+                            <span class="stat-card__label">Saved walks</span>
+                            <strong class="stat-card__value" id="stat-total-walks">0</strong>
+                        </article>
+                        <article class="stat-card">
+                            <span class="stat-card__label">Distance logged</span>
+                            <strong class="stat-card__value" id="stat-total-distance">0.00 km</strong>
+                        </article>
+                        <article class="stat-card">
+                            <span class="stat-card__label">Current draft</span>
+                            <strong class="stat-card__value" id="stat-current-draft">0 points</strong>
+                        </article>
+                        <article class="stat-card">
+                            <span class="stat-card__label">Last save</span>
+                            <strong class="stat-card__value" id="stat-last-saved">Nothing yet</strong>
+                        </article>
+                    </div>
+
+                    <div class="insight-strip">
+                        <div class="insight-chip">
+                            <span class="insight-chip__label">Selection</span>
+                            <strong class="insight-chip__value" id="selection-state">No route selected</strong>
+                        </div>
+                        <div class="insight-chip">
+                            <span class="insight-chip__label">Tracking</span>
+                            <strong class="insight-chip__value" id="tracking-state">GPS idle</strong>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="composer-panel surface-card">
+                    <div class="panel-heading">
+                        <div>
+                            <p class="section-kicker">Capture</p>
+                            <h3>Save the walk to a podcast</h3>
+                        </div>
+                    </div>
+
+                    <label class="field-label" for="podcast-input">Podcast title</label>
+                    <div class="input-shell">
+                        <input type="text" id="podcast-input" list="podcast-suggestions" placeholder="Search or type a podcast title">
+                    </div>
+                    <datalist id="podcast-suggestions"></datalist>
+
+                    <div class="action-grid">
+                        <button id="save-walk" class="primary-button" type="button">Save plotted route</button>
+                        <button id="save-gps-walk" class="secondary-button" type="button">Save GPS route</button>
+                    </div>
+
+                    <div class="tracking-card">
+                        <div class="tracking-card__copy">
+                            <span class="tracking-card__eyebrow">Live mode</span>
+                            <strong>Turn movement into a route automatically.</strong>
+                            <p>Start tracking before your walk, then save the path once you are done.</p>
+                        </div>
+                        <button id="toggleTracking" class="tracking-button" type="button">Start live tracking</button>
+                    </div>
+
+                    <div class="tips-panel">
+                        <p class="tips-panel__title">Best flow</p>
+                        <p>Plot manually by tapping the map, or record live with GPS. Either way, name the podcast first so the route lands in the right collection.</p>
+                    </div>
+                </section>
+
+                <section class="history-panel surface-card" id="walk-history">
+                    <div class="panel-heading panel-heading--history">
+                        <div>
+                            <p class="section-kicker">Library</p>
+                            <h3>Saved walks</h3>
+                        </div>
+                        <button id="clear-paths" class="ghost-danger-button" type="button">Clear all</button>
+                    </div>
+
+                    <ul id="history-list" class="history-list">
+                        <!-- Walk history is rendered here -->
+                    </ul>
+                </section>
+            </aside>
+        </main>
     </div>
 
+    <div id="overlay" class="overlay" hidden></div>
+
+    <section class="modal popup-menu settings-wrapper" id="settings-popup" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <button id="exit-settings-button" class="modal-close" type="button" aria-label="Close settings">×</button>
+        <p class="section-kicker">Preferences</p>
+        <h2 id="settings-title">Tune the experience</h2>
+        <p class="modal-copy">Adjust the look and keep privacy and account controls in one place.</p>
+
+        <div class="settings-actions">
+            <button id="dark-mode-toggle" class="secondary-button" type="button" data-theme-toggle>
+                <span data-theme-label>Toggle theme</span>
+            </button>
+            <button id="privacy-policy-button" class="secondary-button" type="button">Privacy Policy</button>
+            <button id="logoutButton" class="ghost-danger-button" type="button" style="display: none;">Logout</button>
+        </div>
+    </section>
+
+    <section id="authPopup" class="modal popup-menu auth-modal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+        <p class="section-kicker">StepCast Sync</p>
+        <h2 id="authTitle">Login</h2>
+        <p id="authDescription" class="modal-copy">Save walks across devices and pull synced route markers when cloud access is available.</p>
+
+        <div id="authFeedback" class="auth-feedback" hidden></div>
+        <p id="authStaticMessage" class="auth-static-message" hidden>Cloud sync is not configured in this build. Continue in guest mode to use local-only walks.</p>
+
+        <form id="authForm" class="auth-form">
+            <label for="authEmail">Email</label>
+            <div class="input-shell">
+                <input type="email" id="authEmail" required>
+            </div>
+
+            <label for="authPassword">Password</label>
+            <div class="input-shell">
+                <input type="password" id="authPassword" required>
+            </div>
+
+            <button type="submit" id="authSubmit" class="primary-button">Login</button>
+        </form>
+
+        <p id="toggleAuth" class="auth-toggle">Don't have an account? <a href="#" id="switchToRegister">Sign up</a></p>
+        <p id="toggleAuthBack" class="auth-toggle" style="display: none;">Already have an account? <a href="#" id="switchToLogin">Login</a></p>
+
+        <button id="guest-button" class="secondary-button" type="button">Continue in guest mode</button>
+    </section>
+
     <div id="cookie-popup" class="cookie-popup">
-        <p>We use cookies to improve your experience. By continuing to use this site, you accept our <a href="privacy-policy.html">Privacy Policy</a>.</p>
-        <button id="accept-cookies">Accept</button>
+        <p>StepCast uses cookies for sign-in and session continuity. By continuing, you accept the <a href="privacy-policy.html">Privacy Policy</a>.</p>
+        <button id="accept-cookies" class="secondary-button" type="button">Accept</button>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
@@ -104,12 +237,12 @@
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('service-worker.js')
-                .then((registration) => {
-                    console.log('Service Worker registered with scope:', registration.scope);
-                })
-                .catch((error) => {
-                    console.error('Service Worker registration failed:', error);
-                });
+                    .then((registration) => {
+                        console.log('Service Worker registered with scope:', registration.scope);
+                    })
+                    .catch((error) => {
+                        console.error('Service Worker registration failed:', error);
+                    });
             });
         }
     </script>
